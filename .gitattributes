@@ -1,0 +1,17 @@
+# Normalize line endings
+* text=auto
+
+# Force LF for source/text files
+*.py text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.txt text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+render.yaml text eol=lf
+requirements.txt text eol=lf
+
+# Treat database as binary (no line ending conversion)
+*.db binary 
