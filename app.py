@@ -54,7 +54,7 @@ def create_app() -> Flask:
             for r in rows
         ])
 
-    @app.route("/api/products", methods=["POST"])  # Add product
+    @app.route("https://scrapping-bol-frontend.vercel.app/api/products", methods=["POST"])  # Add product
     def api_add_product():
         try:
             payload = request.get_json()
