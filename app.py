@@ -56,6 +56,7 @@ def create_app() -> Flask:
 
     @app.route("/api/products", methods=["POST"])  # add product
     def api_add_product():
+        print("api_add_product", payload)
         payload = request.get_json(silent=True) or {}
         keyword = (payload.get("keyword") or "").strip()
         product_url = (payload.get("product_url") or "").strip()
