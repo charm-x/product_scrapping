@@ -54,19 +54,31 @@ def create_app() -> Flask:
             for r in rows
         ])
 
-    @app.route("/api/products", methods=["POST"])  # add product
+    @app.route("/api/products", methods=["POST"])  # Add product
     def api_add_product():
-        print("api_add_product", payload)
-        payload = request.get_json(silent=True) or {}
-        keyword = (payload.get("keyword") or "").strip()
-        product_url = (payload.get("product_url") or "").strip()
-        stop_after_days = payload.get("stop_after_days")
-        if not keyword or not product_url:
-            return jsonify({"error": "keyword and product_url are required"}), 400
         try:
+            payload = request.get_json()
+            logging.info(f"Received data: {payload}")
+        
+            keyword = (payload.get("keyword") or "").strip()
+            product_url = (payload.get("product_url") or "").strip()
+            stop_after_days = payload.get("stop_after_days")
+
+            if not keyword or not product_url:
+                return jsonify({"error": "keyword and product_url are required"}), 400
+
+            # Optional: Validate stop_after_days if provided
+            if stop_after_days:
+                try:
+                    stop_after_days = int(stop_after_days)
+                except ValueError:
+                    return jsonify({"error": "stop_after_days must be a valid integer"}), 400
+        
             created = tracker.add_tracked_product(keyword, product_url, stop_after_days=stop_after_days)
             return jsonify(created), 201
+        
         except Exception as e:
+            logging.error(f"Error processing request: {str(e)}")
             return jsonify({"error": str(e)}), 400
 
     @app.route("/api/products/<int:pid>", methods=["DELETE"])  # remove product (soft-delete)
