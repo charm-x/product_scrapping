@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import logging
 from flask import Flask, request, jsonify
 from product_tracker import ProductTracker
 from scheduler import scheduler
@@ -10,16 +11,19 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.secret_key = os.environ.get("FLASK_SECRET", "dev-secret")
     tracker = ProductTracker()
-    
+
     # Enable permissive CORS for frontend/API consumers
     CORS(app, resources={r"/api/*": {"origins": "*"}})
 
+    # Configure logging
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
     # Start scheduler if enabled via env (safe on single-worker)
-    if os.environ.get("ENABLE_SCHEDULER", "0").strip().lower() in ("1", "true", "yes"): 
+    if os.environ.get("ENABLE_SCHEDULER", "0").strip().lower() in ("1", "true", "yes"):
         try:
             scheduler.start_scheduler()
-        except Exception:
-            pass
+        except Exception as e:
+            logging.error(f"Failed to start scheduler: {e}")
 
     @app.route("/health")
     def health():
@@ -54,12 +58,12 @@ def create_app() -> Flask:
             for r in rows
         ])
 
-    @app.route("https://scrapping-bol-frontend.vercel.app/api/products", methods=["POST"])  # Add product
+    @app.route("/api/products", methods=["POST"])  # ✅ fixed route
     def api_add_product():
         try:
-            payload = request.get_json()
+            payload = request.get_json(force=True)
             logging.info(f"Received data: {payload}")
-        
+
             keyword = (payload.get("keyword") or "").strip()
             product_url = (payload.get("product_url") or "").strip()
             stop_after_days = payload.get("stop_after_days")
@@ -73,10 +77,10 @@ def create_app() -> Flask:
                     stop_after_days = int(stop_after_days)
                 except ValueError:
                     return jsonify({"error": "stop_after_days must be a valid integer"}), 400
-        
+
             created = tracker.add_tracked_product(keyword, product_url, stop_after_days=stop_after_days)
             return jsonify(created), 201
-        
+
         except Exception as e:
             logging.error(f"Error processing request: {str(e)}")
             return jsonify({"error": str(e)}), 400
@@ -87,6 +91,7 @@ def create_app() -> Flask:
             tracker.remove_tracked_product(pid)
             return jsonify({"ok": True})
         except Exception as e:
+            logging.error(f"Delete error: {e}")
             return jsonify({"error": str(e)}), 400
 
     @app.route("/api/check/<int:tracked_id>", methods=["POST"])  # check one now
@@ -103,6 +108,7 @@ def create_app() -> Flask:
             tracker.save_to_db(keyword, product_id, product_name, result.get("position"), result.get("page_product"))
             return jsonify({"ok": True, **result})
         except Exception as e:
+            logging.error(f"Check one error: {e}")
             return jsonify({"error": str(e)}), 400
 
     @app.route("/api/run-now", methods=["POST"])  # run all scheduled now
@@ -111,6 +117,7 @@ def create_app() -> Flask:
             results = tracker.run_scheduled_checks()
             return jsonify({"results": results})
         except Exception as e:
+            logging.error(f"Run-now error: {e}")
             return jsonify({"error": str(e)}), 400
 
     @app.route("/api/toggle-scheduler/<int:tracked_id>", methods=["POST"])  # toggle per-product
@@ -119,6 +126,7 @@ def create_app() -> Flask:
             new_state = tracker.toggle_daily_scheduler(tracked_id)
             return jsonify({"daily_scheduler": bool(new_state)})
         except Exception as e:
+            logging.error(f"Toggle scheduler error: {e}")
             return jsonify({"error": str(e)}), 400
 
     @app.route("/api/scheduler/status")
@@ -131,6 +139,7 @@ def create_app() -> Flask:
             scheduler.start_scheduler()
             return jsonify({"running": True, **scheduler.get_scheduler_status()})
         except Exception as e:
+            logging.error(f"Scheduler start error: {e}")
             return jsonify({"error": str(e)}), 400
 
     @app.route("/api/scheduler/stop", methods=["POST"])  # stop global scheduler
@@ -139,6 +148,7 @@ def create_app() -> Flask:
             scheduler.stop_scheduler()
             return jsonify({"running": False, **scheduler.get_scheduler_status()})
         except Exception as e:
+            logging.error(f"Scheduler stop error: {e}")
             return jsonify({"error": str(e)}), 400
 
     return app
@@ -147,4 +157,3 @@ def create_app() -> Flask:
 if __name__ == "__main__":
     app = create_app()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False, use_reloader=False)
-
